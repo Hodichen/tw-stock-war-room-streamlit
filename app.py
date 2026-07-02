@@ -183,7 +183,7 @@ def sector_scores(scores: pd.DataFrame) -> pd.DataFrame:
         .agg(
             avg_score=("total_score", "mean"),
             stock_count=("symbol", "count"),
-            symbols=("symbol", lambda x: "、".join(list(x)[:5])),
+            symbols=("symbol", lambda x: "、".join(map(str, list(x)[:5]))),
         )
         .sort_values("avg_score", ascending=False)
     )
