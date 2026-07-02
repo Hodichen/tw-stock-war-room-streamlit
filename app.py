@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+import os
+import requests
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -14,109 +17,42 @@ DATA_DIR = BASE_DIR / "data"
 
 st.set_page_config(
     page_title=APP_TITLE,
-    page_icon="📉",
+    page_icon="📊",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
 
-CUSTOM_CSS = """
+CSS = """
 <style>
-:root {
-  --bg: #0d0a05;
-  --bg2: #17130d;
-  --card: rgba(22, 18, 12, .94);
-  --card2: rgba(35, 28, 18, .78);
-  --gold: #d4af37;
-  --gold2: #f3d37a;
-  --cream: #f5e6c8;
-  --muted: #b8aa8a;
-  --line: rgba(212,175,55,.22);
-  --danger: #d36d5c;
-  --green: #81c995;
-  --blue: #8ab4f8;
+:root{
+  --bg:#0d0a05; --panel:#151009; --panel2:#20170d; --gold:#d4af37;
+  --gold2:#f3d37a; --cream:#f5e6c8; --muted:#b8aa8a; --line:rgba(212,175,55,.24);
+  --red:#d36d5c; --green:#83d6a2; --blue:#8ab4f8; --orange:#f6b26b;
 }
-.stApp {
-  background: radial-gradient(circle at 20% 0%, #2a2113 0%, #0d0a05 36%, #080604 100%);
-  color: var(--cream);
-}
-.block-container { padding-top: 1rem; padding-bottom: 3rem; max-width: 1420px; }
-section[data-testid="stSidebar"] { background: #f3f4f7; }
-section[data-testid="stSidebar"] * { color: #1f2937 !important; }
-h1, h2, h3 { color: var(--cream); letter-spacing: .015em; }
-[data-testid="stMetric"] {
-  border: 1px solid var(--line);
-  background: rgba(23,19,13,.76);
-  border-radius: 18px;
-  padding: .9rem 1rem;
-  min-height: 112px;
-}
-[data-testid="stMetricValue"] { color: var(--cream); font-size: 1.85rem; }
-[data-testid="stMetricLabel"] { color: var(--muted); }
-.hero {
-  border: 1px solid rgba(212,175,55,.32);
-  background: linear-gradient(135deg, rgba(212,175,55,.16), rgba(23,19,13,.72));
-  border-radius: 24px;
-  padding: 1.35rem 1.55rem;
-  box-shadow: 0 18px 50px rgba(0,0,0,.26);
-  margin-bottom: 1rem;
-}
-.hero-title { font-size: 2.2rem; font-weight: 850; color: var(--cream); margin-bottom: .35rem; }
-.hero-sub { color: var(--muted); font-size: .95rem; line-height: 1.65; }
-.verdict {
-  border-left: 6px solid var(--danger);
-  background: rgba(211,109,92,.14);
-  padding: 1rem 1.1rem;
-  border-radius: 16px;
-  color: var(--cream);
-  margin: .75rem 0 1rem 0;
-  font-size: 1.05rem;
-  line-height: 1.75;
-}
-.verdict.bull { border-left-color: var(--green); background: rgba(129,201,149,.12); }
-.verdict.neutral { border-left-color: var(--gold); background: rgba(212,175,55,.11); }
-.card {
-  border: 1px solid var(--line);
-  background: var(--card);
-  border-radius: 18px;
-  padding: 1rem 1.1rem;
-  box-shadow: 0 12px 35px rgba(0,0,0,.22);
-  min-height: 132px;
-  margin-bottom: .72rem;
-}
-.card h4 { color: var(--gold2); margin: 0 0 .55rem 0; font-size: 1.05rem; }
-.card p { color: var(--cream); margin: .25rem 0; line-height: 1.7; }
-.evidence-card {
-  border: 1px solid var(--line);
-  background: linear-gradient(180deg, rgba(38,29,18,.86), rgba(16,12,8,.90));
-  border-radius: 18px;
-  padding: .95rem 1rem;
-  min-height: 138px;
-}
-.evidence-card .tag { color: var(--gold); font-size:.86rem; font-weight: 750; }
-.evidence-card .big { color: var(--cream); font-size: 1.28rem; font-weight: 850; margin:.38rem 0; }
-.evidence-card .small { color: var(--muted); line-height:1.55; font-size:.91rem; }
-.badge {
-  display:inline-block; padding:.23rem .58rem; border-radius:999px;
-  border:1px solid rgba(212,175,55,.38); color:var(--gold2); font-size:.82rem;
-  background: rgba(212,175,55,.07); margin-right:.35rem; margin-bottom:.35rem;
-}
-.small-muted { color: var(--muted); font-size:.88rem; }
-.stTabs [data-baseweb="tab-list"] { gap: .25rem; }
-.stTabs [data-baseweb="tab"] {
-  background: rgba(23,19,13,.75);
-  border-radius: 999px;
-  color: var(--cream);
-  border: 1px solid rgba(212,175,55,.18);
-  padding: .5rem 1rem;
-}
-.stTabs [aria-selected="true"] {
-  background: rgba(212,175,55,.20) !important;
-  border-color: rgba(212,175,55,.55) !important;
-}
+html, body, .stApp{background:radial-gradient(circle at 15% 0%, #2d2211 0%, #0d0a05 38%, #070503 100%); color:var(--cream);} 
+.block-container{padding-top:1.2rem; padding-bottom:4rem; max-width:1480px;}
+section[data-testid="stSidebar"]{display:none!important;} div[data-testid="collapsedControl"]{display:none!important;}
+h1,h2,h3{color:var(--cream); letter-spacing:.01em;} p, li{line-height:1.7;}
+.hero{border:1px solid rgba(212,175,55,.35); background:linear-gradient(135deg, rgba(212,175,55,.15), rgba(16,12,8,.92)); border-radius:28px; padding:1.45rem 1.65rem; box-shadow:0 16px 48px rgba(0,0,0,.35); margin:.4rem 0 1rem;}
+.hero-title{font-size:2.3rem; font-weight:900; color:var(--cream);}
+.hero-sub{color:var(--muted); margin-top:.35rem;}
+.version-box{border:1px solid rgba(212,175,55,.32); background:rgba(212,175,55,.07); border-radius:20px; padding:.9rem 1rem; margin:.2rem 0 1rem;}
+.verdict{border-left:7px solid var(--red); background:rgba(211,109,92,.16); border-radius:18px; padding:1.05rem 1.15rem; margin:1rem 0; font-size:1.15rem; font-weight:760; color:var(--cream);} 
+.verdict.bull{border-left-color:var(--green); background:rgba(131,214,162,.13);} .verdict.neutral{border-left-color:var(--gold); background:rgba(212,175,55,.12);} 
+.kpi{border:1px solid var(--line); background:linear-gradient(180deg, rgba(32,23,13,.85), rgba(13,10,5,.88)); border-radius:22px; padding:1rem 1.1rem; min-height:118px;}
+.kpi-label{color:var(--muted); font-size:.9rem;}.kpi-value{color:var(--cream); font-size:1.85rem; font-weight:850; margin-top:.45rem}.kpi-note{color:var(--muted); font-size:.86rem; margin-top:.2rem;}
+.module{border:1px solid var(--line); background:linear-gradient(180deg, rgba(28,20,10,.96), rgba(12,9,5,.96)); border-radius:22px; padding:1.05rem 1.12rem; min-height:205px; box-shadow:0 12px 34px rgba(0,0,0,.22);}
+.module-top{display:flex; align-items:center; justify-content:space-between; gap:.6rem; margin-bottom:.45rem}.module-title{color:var(--gold2); font-size:1.05rem; font-weight:850}.module-chip{border:1px solid rgba(212,175,55,.35); border-radius:999px; color:var(--gold2); padding:.2rem .55rem; font-size:.82rem; background:rgba(212,175,55,.08)}
+.module-main{font-size:1.55rem; color:var(--cream); font-weight:900; margin:.35rem 0}.module-small{color:var(--muted); font-size:.92rem; line-height:1.62}.evidence{margin-top:.7rem; padding-top:.65rem; border-top:1px solid rgba(212,175,55,.16); color:var(--cream); font-size:.93rem;}
+.card{border:1px solid var(--line); background:rgba(18,14,8,.92); border-radius:22px; padding:1.05rem 1.15rem; margin-bottom:.85rem;}
+.card h4{color:var(--gold2); margin:0 0 .4rem; font-size:1.05rem}.card p{margin:.2rem 0; color:var(--cream)}
+.ai-box{border:1px solid rgba(138,180,248,.35); background:rgba(138,180,248,.08); border-radius:22px; padding:1.1rem 1.2rem; margin:1rem 0;}
+.ai-box h3{margin-top:0}.warn{border:1px solid rgba(211,109,92,.35); background:rgba(211,109,92,.1); border-radius:16px; padding:.75rem .85rem; color:var(--cream);}
+.stDataFrame{border-radius:18px; overflow:hidden}.stTabs [data-baseweb="tab-list"]{gap:.35rem}.stTabs [data-baseweb="tab"]{background:rgba(22,16,8,.85); color:var(--cream); border:1px solid rgba(212,175,55,.22); border-radius:999px; padding:.55rem 1.1rem}.stTabs [aria-selected="true"]{background:rgba(212,175,55,.22)!important; border-color:rgba(212,175,55,.55)!important;}
+div[role="radiogroup"]{gap:.8rem;} div[role="radiogroup"] label{border:1px solid rgba(212,175,55,.35); border-radius:18px; padding:.75rem 1.05rem; background:rgba(212,175,55,.08); min-width:210px;}
 </style>
 """
-st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
-
+st.markdown(CSS, unsafe_allow_html=True)
 
 @dataclass
 class DataBundle:
@@ -136,7 +72,7 @@ def read_csv_safely(path: Path) -> pd.DataFrame:
 
 
 @st.cache_data(ttl=300)
-def load_sample_data() -> DataBundle:
+def load_data() -> DataBundle:
     return DataBundle(
         etf=read_csv_safely(DATA_DIR / "etf_holdings_sample.csv"),
         risk=read_csv_safely(DATA_DIR / "risk_stocks_sample.csv"),
@@ -153,444 +89,430 @@ def normalize_numeric(df: pd.DataFrame, cols: Iterable[str]) -> pd.DataFrame:
     return out
 
 
-def upload_or_sample(label: str, sample: pd.DataFrame, key: str) -> pd.DataFrame:
-    file = st.sidebar.file_uploader(label, type=["csv"], key=key)
-    if file is not None:
-        try:
-            return pd.read_csv(file)
-        except Exception as exc:
-            st.sidebar.error(f"CSV 讀取失敗：{exc}")
-    return sample
+def bias_score(market: pd.DataFrame, names: list[str]) -> tuple[int, str, str]:
+    if market.empty or "item" not in market.columns:
+        return 0, "資料不足", "尚未有市場資料"
+    m = market.copy()
+    m["item"] = m["item"].astype(str)
+    m = normalize_numeric(m, ["value"])
+    subset = m[m["item"].isin(names)]
+    if subset.empty:
+        return 0, "資料不足", "尚未有對應資料"
+    signed = []
+    evidence = []
+    for _, row in subset.iterrows():
+        bias = str(row.get("bias", "")).lower()
+        value = float(row.get("value", 0))
+        if bias == "bearish" or value < 0:
+            signed.append(-1)
+        elif bias == "bullish" or value > 0:
+            signed.append(1)
+        else:
+            signed.append(0)
+        evidence.append(f"{row.get('item')} {value:g}：{row.get('note', '')}")
+    score = int(sum(signed))
+    direction = "偏多" if score > 0 else "偏空" if score < 0 else "中性"
+    return score, direction, "｜".join(evidence[:3])
 
 
 def score_stocks(etf: pd.DataFrame, risk: pd.DataFrame, forum: pd.DataFrame) -> pd.DataFrame:
     columns = [
-        "symbol", "name", "sector", "etf_count", "avg_weight", "weight_3d_change",
-        "weight_5d_change", "weight_10d_change", "shares_change_10d", "etf_score",
-        "forum_score", "forum_mentions", "risk_penalty", "total_score", "conclusion", "why"
+        "symbol", "name", "sector", "etf_count", "avg_weight", "weight_3d_change", "weight_5d_change",
+        "weight_10d_change", "shares_change_10d", "etf_score", "forum_score", "forum_mentions",
+        "risk_penalty", "total_score", "conclusion", "why"
     ]
     if etf.empty:
         return pd.DataFrame(columns=columns)
-
     etf = etf.copy()
     for col in ["symbol", "name", "sector", "etf_code"]:
         if col in etf.columns:
             etf[col] = etf[col].astype(str)
-    etf = normalize_numeric(etf, [
-        "weight", "weight_3d_change", "weight_5d_change", "weight_10d_change", "shares_change_10d"
-    ])
-
-    grouped = (
-        etf.groupby(["symbol", "name", "sector"], as_index=False)
-        .agg(
-            etf_count=("etf_code", "nunique"),
-            avg_weight=("weight", "mean"),
-            weight_3d_change=("weight_3d_change", "mean"),
-            weight_5d_change=("weight_5d_change", "mean"),
-            weight_10d_change=("weight_10d_change", "mean"),
-            shares_change_10d=("shares_change_10d", "sum"),
-        )
+    etf = normalize_numeric(etf, ["weight", "weight_3d_change", "weight_5d_change", "weight_10d_change", "shares_change_10d"])
+    grouped = etf.groupby(["symbol", "name", "sector"], as_index=False).agg(
+        etf_count=("etf_code", "nunique"), avg_weight=("weight", "mean"),
+        weight_3d_change=("weight_3d_change", "mean"), weight_5d_change=("weight_5d_change", "mean"),
+        weight_10d_change=("weight_10d_change", "mean"), shares_change_10d=("shares_change_10d", "sum"),
     )
-
     grouped["etf_score"] = (
-        grouped["etf_count"].clip(0, 5) * 10
-        + grouped["weight_3d_change"].clip(-1, 1) * 22
-        + grouped["weight_5d_change"].clip(-1, 1) * 20
-        + grouped["weight_10d_change"].clip(-1, 1) * 18
+        grouped["etf_count"].clip(0, 5) * 10 + grouped["weight_3d_change"].clip(-1, 1) * 22
+        + grouped["weight_5d_change"].clip(-1, 1) * 20 + grouped["weight_10d_change"].clip(-1, 1) * 18
         + (grouped["shares_change_10d"] > 0).astype(int) * 8
     ).clip(0, 100)
-
     if not forum.empty and "symbol" in forum.columns:
-        forum = forum.copy()
-        forum["symbol"] = forum["symbol"].astype(str)
-        forum = normalize_numeric(forum, ["mentions"])
-        forum_score = forum.groupby("symbol", as_index=False).agg(forum_mentions=("mentions", "sum"))
-        max_mentions = max(float(forum_score["forum_mentions"].max()), 1.0)
-        forum_score["forum_score"] = (forum_score["forum_mentions"] / max_mentions * 100).round(1)
-        grouped = grouped.merge(forum_score, on="symbol", how="left")
+        forum = forum.copy(); forum["symbol"] = forum["symbol"].astype(str); forum = normalize_numeric(forum, ["mentions"])
+        fs = forum.groupby("symbol", as_index=False).agg(forum_mentions=("mentions", "sum"))
+        mx = max(float(fs["forum_mentions"].max()), 1.0)
+        fs["forum_score"] = (fs["forum_mentions"] / mx * 100).round(1)
+        grouped = grouped.merge(fs, on="symbol", how="left")
     else:
-        grouped["forum_score"] = 0
-        grouped["forum_mentions"] = 0
+        grouped["forum_score"] = 0; grouped["forum_mentions"] = 0
     grouped[["forum_score", "forum_mentions"]] = grouped[["forum_score", "forum_mentions"]].fillna(0)
-
-    penalty_map = {"high": 30, "medium": 15, "low": 5}
     if not risk.empty and "symbol" in risk.columns:
-        risk_penalty = risk.copy()
-        risk_penalty["symbol"] = risk_penalty["symbol"].astype(str)
-        risk_penalty["risk_penalty"] = risk_penalty.get("risk_level", "low").astype(str).map(penalty_map).fillna(5)
-        risk_penalty = risk_penalty.groupby("symbol", as_index=False).agg(risk_penalty=("risk_penalty", "max"))
-        grouped = grouped.merge(risk_penalty, on="symbol", how="left")
+        risk = risk.copy(); risk["symbol"] = risk["symbol"].astype(str)
+        penalty_map = {"high": 30, "medium": 15, "low": 5}
+        risk["risk_penalty"] = risk.get("risk_level", "low").astype(str).map(penalty_map).fillna(5)
+        rp = risk.groupby("symbol", as_index=False).agg(risk_penalty=("risk_penalty", "max"))
+        grouped = grouped.merge(rp, on="symbol", how="left")
     else:
         grouped["risk_penalty"] = 0
     grouped["risk_penalty"] = grouped["risk_penalty"].fillna(0)
-
-    grouped["total_score"] = (
-        grouped["etf_score"] * 0.58
-        + grouped["forum_score"] * 0.15
-        + grouped["avg_weight"].clip(0, 8) * 2.2
-        - grouped["risk_penalty"]
-    ).round(1).clip(0, 100)
-
-    def conclusion(row: pd.Series) -> str:
-        if row["risk_penalty"] >= 25:
-            return "風險優先，不追"
-        if row["total_score"] >= 78:
-            return "強勢觀察"
-        if row["total_score"] >= 68:
-            return "觀察池"
-        if row["total_score"] >= 56:
-            return "題材追蹤"
-        return "僅追蹤"
-
-    def why(row: pd.Series) -> str:
-        reasons: list[str] = []
-        if row["etf_count"] >= 3:
-            reasons.append(f"{int(row['etf_count'])} 檔主動 ETF 同步")
-        if row["weight_3d_change"] > 0:
-            reasons.append(f"3日權重 +{row['weight_3d_change']:.2f}")
-        if row["weight_10d_change"] > 0:
-            reasons.append(f"10日權重 +{row['weight_10d_change']:.2f}")
-        if row["forum_mentions"] > 0:
-            reasons.append(f"討論 {int(row['forum_mentions'])} 次")
-        if row["risk_penalty"] > 0:
-            reasons.append(f"風險扣分 {int(row['risk_penalty'])}")
-        return "；".join(reasons[:4]) if reasons else "資料不足"
-
-    grouped["conclusion"] = grouped.apply(conclusion, axis=1)
-    grouped["why"] = grouped.apply(why, axis=1)
-    return grouped.sort_values("total_score", ascending=False).reset_index(drop=True)
+    grouped["total_score"] = (grouped["etf_score"] * .58 + grouped["forum_score"] * .15 + grouped["avg_weight"].clip(0, 8) * 2.2 - grouped["risk_penalty"]).round(1).clip(0, 100)
+    grouped["conclusion"] = grouped.apply(lambda r: "風險優先，不追" if r.risk_penalty >= 25 else "強勢觀察" if r.total_score >= 78 else "觀察池" if r.total_score >= 68 else "題材追蹤" if r.total_score >= 56 else "僅追蹤", axis=1)
+    grouped["why"] = grouped.apply(lambda r: "；".join([x for x in [
+        f"{int(r.etf_count)}檔ETF共識" if r.etf_count >= 2 else "",
+        f"3日權重+{r.weight_3d_change:.2f}" if r.weight_3d_change > 0 else "",
+        f"10日權重+{r.weight_10d_change:.2f}" if r.weight_10d_change > 0 else "",
+        f"論壇{int(r.forum_mentions)}次" if r.forum_mentions > 0 else "",
+        f"風險扣{int(r.risk_penalty)}" if r.risk_penalty > 0 else "",
+    ] if x][:4]) or "資料不足", axis=1)
+    return grouped.sort_values(["total_score", "etf_count"], ascending=False).reset_index(drop=True)
 
 
-def sector_scores(scores: pd.DataFrame) -> pd.DataFrame:
-    if scores.empty:
-        return pd.DataFrame(columns=["sector", "etf_strength", "attention", "risk_penalty", "total", "symbols"])
-    base = (
-        scores.groupby("sector", as_index=False)
-        .agg(
-            etf_strength=("etf_score", "mean"),
-            attention=("forum_score", "mean"),
-            risk_penalty=("risk_penalty", "mean"),
-            stock_count=("symbol", "count"),
-            symbols=("symbol", lambda x: "、".join(map(str, list(x)[:5]))),
-        )
+def sector_scores(stocks: pd.DataFrame) -> pd.DataFrame:
+    if stocks.empty:
+        return pd.DataFrame(columns=["sector", "sector_score", "stocks", "count"])
+    out = stocks.groupby("sector", as_index=False).agg(
+        sector_score=("total_score", "mean"), count=("symbol", "count"),
+        stocks=("symbol", lambda x: "、".join(map(str, list(x)[:5]))),
     )
-    base["total"] = (base["etf_strength"] * 0.70 + base["attention"] * 0.18 - base["risk_penalty"] * 0.35).round(1).clip(0, 100)
-    for col in ["etf_strength", "attention", "risk_penalty"]:
-        base[col] = base[col].round(1)
-    return base.sort_values("total", ascending=False).reset_index(drop=True)
+    out["sector_score"] = out["sector_score"].round(1)
+    return out.sort_values("sector_score", ascending=False)
 
 
-def market_evidence(market: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, object]]:
-    columns = ["模組", "客觀結果", "方向", "分數", "證據"]
-    if market.empty:
-        return pd.DataFrame(columns=columns), {
-            "verdict": "資料不足 / 不下結論",
-            "class": "neutral",
-            "one_line": "缺美股與台指夜盤資料，不能用 ETF 或 KOL 硬推方向。",
-            "us_score": 0,
-            "night_score": 0,
-            "total_score": 0,
-        }
+def round_price(x: float) -> float:
+    if x >= 1000: step = 5
+    elif x >= 500: step = 1
+    elif x >= 100: step = 0.5
+    elif x >= 50: step = 0.1
+    else: step = 0.05
+    return round(round(x / step) * step, 2)
 
-    m = market.copy()
-    m["item"] = m.get("item", "").astype(str)
-    m["bias"] = m.get("bias", "neutral").astype(str).str.lower()
-    m = normalize_numeric(m, ["value"])
 
-    def score_from_bias(bias: str, value: float) -> int:
-        if bias == "bullish":
-            return 1
-        if bias == "bearish":
-            return -1
-        if value > 0:
-            return 1
-        if value < 0:
-            return -1
-        return 0
+def secret_get(name: str, default=None):
+    try:
+        value = st.secrets.get(name, default)
+    except Exception:
+        value = default
+    if value is None:
+        value = os.getenv(name, default)
+    return value
 
-    m["score"] = m.apply(lambda r: score_from_bias(str(r.get("bias", "neutral")), float(r.get("value", 0))), axis=1)
-    m["direction_text"] = m["score"].map({1: "偏多", 0: "中性", -1: "偏空"}).fillna("中性")
 
-    night_mask = m["item"].str.contains("台指|夜盤|期", regex=True, na=False)
-    us_mask = ~night_mask
-    us_score = int(m.loc[us_mask, "score"].sum())
-    night_score = int(m.loc[night_mask, "score"].sum())
-    total = us_score + night_score
+def parse_price_payload(payload) -> dict[str, float]:
+    """支援常見 API 池格式：
+    1. {"2330": 1415, "2408": 76.2}
+    2. {"data": [{"symbol":"2330", "price":1415}]}
+    3. [{"symbol":"2330", "close":1415}]
+    """
+    out: dict[str, float] = {}
+    rows = payload
+    if isinstance(payload, dict):
+        if "data" in payload:
+            rows = payload["data"]
+        elif "result" in payload:
+            rows = payload["result"]
+        else:
+            # dict mapping: symbol -> price 或 symbol -> object
+            for k, v in payload.items():
+                if isinstance(v, (int, float, str)):
+                    try:
+                        out[str(k)] = float(str(v).replace(',', ''))
+                    except Exception:
+                        pass
+                elif isinstance(v, dict):
+                    for key in ["price", "last", "close", "current", "reference_price", "ref_price"]:
+                        if key in v:
+                            try:
+                                out[str(k)] = float(str(v[key]).replace(',', ''))
+                                break
+                            except Exception:
+                                pass
+            return out
+    if isinstance(rows, list):
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            symbol = str(row.get("symbol") or row.get("stock_id") or row.get("code") or row.get("ticker") or "").strip()
+            if not symbol:
+                continue
+            for key in ["price", "last", "close", "current", "reference_price", "ref_price", "成交價", "收盤價"]:
+                if key in row:
+                    try:
+                        out[symbol] = float(str(row[key]).replace(',', ''))
+                        break
+                    except Exception:
+                        pass
+    return out
 
-    if us_score <= -2 and night_score <= -1:
-        verdict = "偏空 / 觀望"
-        css_class = "bear"
-        one_line = "簡單結論：隔夜風向與台指夜盤同向偏空，今天不應輸出『上漲』結論；先防守，不追高。"
-    elif us_score <= -2 or night_score <= -1:
-        verdict = "中性偏空"
-        css_class = "neutral"
-        one_line = "簡單結論：至少一個關鍵盤前模組偏空，今日先觀望，等 9:10 開盤確認。"
-    elif us_score >= 3 and night_score >= 1:
-        verdict = "偏多但需確認"
-        css_class = "bull"
-        one_line = "簡單結論：盤前證據偏多，但仍要等日盤開盤後確認，不直接追價。"
-    elif total > 0:
-        verdict = "中性偏多"
-        css_class = "neutral"
-        one_line = "簡單結論：證據略偏多，但沒有強到可以直接下多方結論。"
+
+@st.cache_data(ttl=60)
+def fetch_price_pool(symbols: tuple[str, ...]) -> tuple[dict[str, float], str]:
+    """從你的 API 池抓股價。沒設定時回傳空 dict，使用示範價。"""
+    csv_url = secret_get("PUBLIC_PRICE_CSV_URL") or secret_get("GOOGLE_STOCK_CSV_URL")
+    api_url = secret_get("PUBLIC_PRICE_API_URL") or secret_get("GOOGLE_STOCK_API_URL")
+    api_key = secret_get("PUBLIC_PRICE_API_KEY") or secret_get("GOOGLE_STOCK_API_KEY")
+    method = str(secret_get("PUBLIC_PRICE_API_METHOD", "GET")).upper()
+    symbols_csv = ",".join(symbols)
+
+    # 最簡單：Google Sheet 發布成 CSV，欄位支援 symbol, price / close / last
+    if csv_url:
+        try:
+            df = pd.read_csv(csv_url)
+            payload = df.to_dict("records")
+            return parse_price_payload(payload), "Google Sheet CSV"
+        except Exception as exc:
+            return {}, f"CSV API 失敗：{exc}"
+
+    if not api_url:
+        return {}, "未設定 API 池，使用示範價"
+
+    try:
+        headers = {"Accept": "application/json"}
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+            headers["x-api-key"] = api_key
+        if method == "POST":
+            resp = requests.post(api_url, headers=headers, json={"symbols": list(symbols)}, timeout=12)
+        else:
+            resp = requests.get(api_url, headers=headers, params={"symbols": symbols_csv}, timeout=12)
+        resp.raise_for_status()
+        return parse_price_payload(resp.json()), f"API 池：{method}"
+    except Exception as exc:
+        return {}, f"API 池失敗，使用示範價：{exc}"
+
+
+def add_trade_plan(stocks: pd.DataFrame, market_label: str) -> pd.DataFrame:
+    if stocks.empty:
+        return stocks
+    # 正式版優先讀你的 API 池；抓不到才用示範價。
+    symbols = tuple(stocks["symbol"].astype(str).tolist())
+    api_prices, api_note = fetch_price_pool(symbols)
+    demo_prices = {
+        "2330": 1415.0, "3017": 748.0, "2408": 76.2, "6669": 3150.0, "3661": 2920.0,
+        "2382": 307.0, "2454": 1320.0, "8299": 675.0, "6274": 295.0, "4966": 775.0,
+        "2356": 64.5, "3443": 1210.0,
+    }
+    merged_prices = {**demo_prices, **api_prices}
+    out = stocks.copy()
+    out["reference_price"] = out["symbol"].astype(str).map(merged_prices).fillna(100.0)
+    bearish = "偏空" in market_label or "觀望" in market_label
+    if bearish:
+        out["entry_price"] = out["reference_price"].apply(lambda p: round_price(p * 1.018))
+        out["stop_price"] = out["reference_price"].apply(lambda p: round_price(p * 0.985))
+        out["target_price"] = out["reference_price"].apply(lambda p: round_price(p * 1.04))
+        out["entry_condition"] = "只做轉強價：9:10後站上進場價且不能跌回；大盤未翻多不追高"
     else:
-        verdict = "中性觀望"
-        css_class = "neutral"
-        one_line = "簡單結論：盤前證據不足或互相抵銷，今日先等開盤確認。"
+        out["entry_price"] = out["reference_price"].apply(lambda p: round_price(p * 1.008))
+        out["stop_price"] = out["reference_price"].apply(lambda p: round_price(p * 0.98))
+        out["target_price"] = out["reference_price"].apply(lambda p: round_price(p * 1.045))
+        out["entry_condition"] = "站上進場價且量能放大；跌回昨收附近不追"
+    out["price_note"] = api_note
+    return out
 
-    rows = []
-    if not m.loc[us_mask].empty:
-        us_notes = []
-        for _, r in m.loc[us_mask].iterrows():
-            sign = "+" if float(r.get("value", 0)) > 0 else ""
-            us_notes.append(f"{r['item']} {sign}{float(r.get('value', 0)):.2f}%：{r.get('note', '')}")
-        rows.append({
-            "模組": "1. 前一日美股 / 費半",
-            "客觀結果": "偏多數" if us_score > 0 else "偏空數" if us_score < 0 else "多空相抵",
-            "方向": "偏多" if us_score > 0 else "偏空" if us_score < 0 else "中性",
-            "分數": us_score,
-            "證據": "｜".join(us_notes[:8]),
-        })
-    if not m.loc[night_mask].empty:
-        nt_notes = []
-        for _, r in m.loc[night_mask].iterrows():
-            val = float(r.get("value", 0))
-            sign = "+" if val > 0 else ""
-            unit = "點" if abs(val) > 20 else "%"
-            nt_notes.append(f"{r['item']} {sign}{val:.2f}{unit}：{r.get('note', '')}")
-        rows.append({
-            "模組": "2. 台指期夜盤",
-            "客觀結果": "夜盤偏多" if night_score > 0 else "夜盤偏空" if night_score < 0 else "夜盤中性",
-            "方向": "偏多" if night_score > 0 else "偏空" if night_score < 0 else "中性",
-            "分數": night_score,
-            "證據": "｜".join(nt_notes[:4]),
-        })
+def market_verdict(us_score: int, fut_score: int, mode: str) -> tuple[str, str, str]:
+    # 防呆：美股與台指夜盤同空，不允許輸出偏多。
+    if us_score < 0 and fut_score < 0:
+        return "偏空 / 觀望", "隔夜風向與台指夜盤同向偏空，今天不應輸出『上漲』結論；先防守，不追高。", "bear"
+    if us_score > 0 and fut_score > 0:
+        if mode.startswith("8:50"):
+            return "偏多但需確認", "美股與夜盤偏多，但8:50仍要等開盤後量價確認，避免假開高。", "bull"
+        return "偏多 / 可觀察強勢延續", "9:10後若權值與主線同步站穩，可提高觀察股權重。", "bull"
+    return "中性 / 等待確認", "外部風向與夜盤不同步，先看9:10開盤確認，不用急著判斷方向。", "neutral"
 
-    return pd.DataFrame(rows, columns=columns), {
-        "verdict": verdict,
-        "class": css_class,
-        "one_line": one_line,
-        "us_score": us_score,
-        "night_score": night_score,
-        "total_score": total,
+
+def module_summary(bundle: DataBundle, stocks: pd.DataFrame) -> dict:
+    us_score, us_dir, us_evd = bias_score(bundle.market, ["道瓊", "S&P 500", "Nasdaq", "費半", "VIX"])
+    fut_score, fut_dir, fut_evd = bias_score(bundle.market, ["台指期夜盤"])
+    top_sector = sector_scores(stocks).iloc[0].to_dict() if not sector_scores(stocks).empty else {"sector":"資料不足", "sector_score":0, "stocks":""}
+    risk_count = len(bundle.risk) if not bundle.risk.empty else 0
+    high_risk = int((bundle.risk.get("risk_level", pd.Series(dtype=str)).astype(str) == "high").sum()) if not bundle.risk.empty else 0
+    forum_mentions = int(pd.to_numeric(bundle.forum.get("mentions", pd.Series(dtype=float)), errors="coerce").fillna(0).sum()) if not bundle.forum.empty else 0
+    return {
+        "us_score": us_score, "us_dir": us_dir, "us_evidence": us_evd,
+        "fut_score": fut_score, "fut_dir": fut_dir, "fut_evidence": fut_evd,
+        "top_sector": top_sector,
+        "risk_count": risk_count, "high_risk": high_risk,
+        "forum_mentions": forum_mentions,
     }
 
 
-def build_evidence_rows(scores: pd.DataFrame, sectors: pd.DataFrame, risk: pd.DataFrame, forum: pd.DataFrame, market_ev: pd.DataFrame) -> pd.DataFrame:
-    rows = []
-    if not market_ev.empty:
-        rows.extend(market_ev.to_dict("records"))
-
-    if sectors.empty:
-        rows.append({"模組": "3. 主動 ETF 持股趨勢", "客觀結果": "資料不足", "方向": "不判斷", "分數": 0, "證據": "尚無 ETF 持股資料。"})
-    else:
-        s = sectors.iloc[0]
-        rows.append({
-            "模組": "3. 主動 ETF 持股趨勢",
-            "客觀結果": f"熱區：{s['sector']}",
-            "方向": "中期熱區，不等於今日方向",
-            "分數": float(s["total"]),
-            "證據": f"ETF 強度 {s['etf_strength']}；注意力 {s['attention']}；代表股 {s['symbols']}。",
-        })
-
-    risk_count = len(risk)
-    high_risk = 0 if risk.empty or "risk_level" not in risk.columns else int((risk["risk_level"].astype(str) == "high").sum())
-    rows.append({
-        "模組": "4. 處置 / 注意股票",
-        "客觀結果": f"{risk_count} 檔風險股，高風險 {high_risk} 檔",
-        "方向": "風控扣分",
-        "分數": -high_risk,
-        "證據": "處置中、注意累計、即將解除只用於風險控管，不當作利多。",
-    })
-
-    if forum.empty:
-        rows.append({"模組": "5. 論壇 / KOL 熱度", "客觀結果": "資料不足", "方向": "不判斷", "分數": 0, "證據": "尚無討論熱度資料。"})
-    else:
-        f = forum.copy()
-        f["symbol"] = f.get("symbol", "").astype(str)
-        f = normalize_numeric(f, ["mentions"])
-        top = f.sort_values("mentions", ascending=False).head(3)
-        rows.append({
-            "模組": "5. 論壇 / KOL 熱度",
-            "客觀結果": "注意力集中" if top["mentions"].sum() > 0 else "無明顯熱度",
-            "方向": "注意力，不等於勝率",
-            "分數": int(top["mentions"].sum()),
-            "證據": "；".join((top["symbol"].astype(str) + " " + top.get("name", pd.Series([""] * len(top))).astype(str) + "：" + top["mentions"].astype(int).astype(str) + "次").tolist()),
-        })
-    return pd.DataFrame(rows)
-
-
-def build_ai_conclusion(verdict: dict[str, object], sectors: pd.DataFrame, scores: pd.DataFrame, risk: pd.DataFrame) -> list[dict[str, str]]:
-    top_sector = sectors.iloc[0]["sector"] if not sectors.empty else "尚未形成"
-    top_symbols = sectors.iloc[0]["symbols"] if not sectors.empty else "尚無"
-    watch = scores.head(5)
-    watch_text = "、".join((watch["symbol"].astype(str) + " " + watch["name"].astype(str)).tolist()) if not watch.empty else "尚無"
-    high_risk = 0 if risk.empty or "risk_level" not in risk.columns else int((risk["risk_level"].astype(str) == "high").sum())
-    market_verdict = str(verdict["verdict"])
-
-    if "偏空" in market_verdict:
-        action = "不追高，觀察 9:10 是否收回夜盤壓力；若台積電、櫃買、電子權值沒有同步止穩，今日只做風險控管。"
-    elif "偏多" in market_verdict:
-        action = "可以準備觀察池，但只在開盤確認後處理；第一根急拉不追，等回測或突破有效。"
-    else:
-        action = "先等開盤確認，不用急著找多方標的。"
-
-    return [
-        {"title": "1. 簡單結論", "body": f"{market_verdict}。{action}"},
-        {"title": "2. 客觀證據", "body": f"盤前方向由美股 / 費半與台指期夜盤決定；ETF、KOL、處置股不能覆蓋這個方向。美股分數 {verdict['us_score']}，夜盤分數 {verdict['night_score']}。"},
-        {"title": "3. 資金熱區", "body": f"主動 ETF 與注意力目前指向「{top_sector}」，代表股：{top_symbols}。這是觀察池來源，不是今日一定上漲的理由。"},
-        {"title": "4. 今日觀察池", "body": f"只列觀察，不列買進：{watch_text}。若大盤偏空，觀察池也要降級，只看誰抗跌、誰能在 9:10 後轉強。"},
-        {"title": "5. 失效條件", "body": f"若台指期續弱、台積電開高走低、櫃買翻黑、主線族群只剩單點拉抬，偏多假設失效。處置 / 注意高風險 {high_risk} 檔不追。"},
-    ]
-
-
-def scenario_table(verdict: str) -> pd.DataFrame:
+def fallback_ai(verdict: str, ms: dict, watch: pd.DataFrame) -> str:
+    top_names = "、".join((watch["symbol"].astype(str) + " " + watch["name"].astype(str)).head(3).tolist()) if not watch.empty else "暫無"
     if "偏空" in verdict:
-        main_action = "防守：不追高，等 9:10 確認是否止穩。"
-    elif "偏多" in verdict:
-        main_action = "進攻但等確認：只看觀察池，等回測或突破有效。"
-    else:
-        main_action = "觀望：等開盤量價與權值股確認。"
-    return pd.DataFrame([
-        {"劇本": "目前主劇本", "確認條件": verdict, "動作": main_action},
-        {"劇本": "轉強條件", "確認條件": "台指期收回夜盤關鍵價；台積電不開高走低；電子權值與櫃買同步轉強", "動作": "觀察池恢復有效，但仍不追第一根急拉"},
-        {"劇本": "轉弱條件", "確認條件": "台指期跌破夜盤低點；台積電壓回；櫃買翻黑；強勢族群只剩單點", "動作": "取消追價，風險股與論壇過熱股列為不碰"},
-    ])
+        return f"AI輔助摘要：今天主策略不是追價，而是找抗跌與轉強確認。美股/費半與台指夜盤偏空時，ETF熱區只能當中期觀察池。優先觀察 {top_names} 是否在9:10後站上條件價；未站上就不做。"
+    if "偏多" in verdict:
+        return f"AI輔助摘要：外部風向支持偏多，但仍要看9:10後量價是否延續。優先追蹤ETF共識度高且沒有處置風險的 {top_names}，跌回失效價則降級。"
+    return f"AI輔助摘要：目前訊號分歧，今天應以確認為主。{top_names} 可列入觀察，但必須等大盤與個股同時轉強，不用預設方向。"
 
 
-bundle = load_sample_data()
+def call_ai(verdict: str, ms: dict, module_rows: list[dict], watch: pd.DataFrame) -> str:
+    provider = str(secret_get("AI_PROVIDER", "google")).lower()
+    payload = {
+        "market_verdict": verdict,
+        "modules": module_rows,
+        "watchlist": watch[["symbol", "name", "sector", "total_score", "entry_price", "stop_price", "entry_condition"]].head(5).to_dict("records") if not watch.empty else [],
+    }
+    prompt = """
+你是台股盤前交易研究助理。請根據客觀證據輸出繁體中文摘要。
+規則：
+1. 若美股與台指期夜盤同空，不能寫偏多，最多只能寫觀望/防守。
+2. ETF只代表中期資金熱區，不等於今日方向。
+3. KOL/論壇只代表注意力，不代表勝率。
+4. 每檔股票必須寫條件價、失效價、為何觀察。
+5. 不要使用保證語氣，不要說必漲。
+請輸出：簡單結論、今日主線、三檔觀察股、風險提醒、失效條件。
+資料：
+""" + json.dumps(payload, ensure_ascii=False)
 
-with st.sidebar:
-    st.title("資料設定")
-    st.caption("第一版用 CSV / 範例資料。正式版會改成 8:30 自動抓資料、8:50 自動產報告、9:10 更新確認版。")
-    mode = st.radio("報告模式", ["8:50 盤前版", "9:10 開盤確認版"], index=0)
-    st.divider()
-    with st.expander("進階：手動上傳 CSV", expanded=False):
-        etf_df = upload_or_sample("ETF 持股 CSV", bundle.etf, "etf")
-        risk_df = upload_or_sample("處置 / 注意股 CSV", bundle.risk, "risk")
-        forum_df = upload_or_sample("論壇 / KOL CSV", bundle.forum, "forum")
-        market_df = upload_or_sample("美股 / 台指期 CSV", bundle.market, "market")
-    st.divider()
-    st.caption("左側只放設定；主畫面先給結論，再給證據。")
+    # 預設使用 Google Gemini。適合你說的 Google API 池。
+    if provider in ["google", "gemini"]:
+        key = secret_get("GOOGLE_API_KEY") or secret_get("GEMINI_API_KEY")
+        if not key:
+            return fallback_ai(verdict, ms, watch) + "\n\n（尚未設定 GOOGLE_API_KEY / GEMINI_API_KEY，暫用規則摘要。）"
+        try:
+            from google import genai
+            client = genai.Client(api_key=key)
+            model = secret_get("GOOGLE_MODEL", "gemini-2.5-flash") or "gemini-2.5-flash"
+            resp = client.models.generate_content(model=model, contents=prompt)
+            return getattr(resp, "text", str(resp))
+        except Exception as exc:
+            return fallback_ai(verdict, ms, watch) + f"\n\n（Gemini API 呼叫失敗，已使用規則摘要。錯誤：{exc}）"
 
-scores = score_stocks(etf_df, risk_df, forum_df)
-sectors = sector_scores(scores)
-market_ev, verdict = market_evidence(market_df)
-evidence = build_evidence_rows(scores, sectors, risk_df, forum_df, market_ev)
-report_items = build_ai_conclusion(verdict, sectors, scores, risk_df)
+    # 保留 OpenAI fallback，之後要切回也不用重寫。
+    key = secret_get("OPENAI_API_KEY")
+    if not key:
+        return fallback_ai(verdict, ms, watch)
+    try:
+        from openai import OpenAI
+        client = OpenAI(api_key=key)
+        model = secret_get("OPENAI_MODEL", "gpt-4o-mini") or "gpt-4o-mini"
+        resp = client.responses.create(model=model, input=prompt, max_output_tokens=700)
+        return getattr(resp, "output_text", str(resp))
+    except Exception as exc:
+        return fallback_ai(verdict, ms, watch) + f"\n\n（OpenAI API 呼叫失敗，已使用規則摘要。錯誤：{exc}）"
 
-st.markdown(
-    f"""
-    <div class="hero">
-      <div class="hero-title">{APP_TITLE}</div>
-      <div class="hero-sub">{mode}｜產生時間：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}｜流程：簡單結論 → 五模組客觀證據 → AI 綜合結論</div>
-      <div style="margin-top:.75rem;">
-        <span class="badge">1 美股 / 費半</span>
-        <span class="badge">2 台指期夜盤</span>
-        <span class="badge">3 主動 ETF</span>
-        <span class="badge">4 處置注意股</span>
-        <span class="badge">5 論壇 KOL</span>
-      </div>
+def kpi(label: str, value: str, note: str = "") -> None:
+    st.markdown(f"<div class='kpi'><div class='kpi-label'>{label}</div><div class='kpi-value'>{value}</div><div class='kpi-note'>{note}</div></div>", unsafe_allow_html=True)
+
+
+def render_module(no: int, title: str, main: str, direction: str, score: str, evidence: str) -> None:
+    st.markdown(f"""
+    <div class='module'>
+      <div class='module-top'><div class='module-title'>{no}. {title}</div><div class='module-chip'>{score}</div></div>
+      <div class='module-main'>{main}</div>
+      <div class='module-small'>方向：{direction}</div>
+      <div class='evidence'>證據：{evidence}</div>
     </div>
-    """,
-    unsafe_allow_html=True,
-)
+    """, unsafe_allow_html=True)
 
-css_class = "bull" if verdict["class"] == "bull" else "neutral" if verdict["class"] == "neutral" else ""
-st.markdown(f"<div class='verdict {css_class}'><b>{verdict['one_line']}</b></div>", unsafe_allow_html=True)
 
-m1, m2, m3, m4, m5 = st.columns(5)
-m1.metric("盤前結論", str(verdict["verdict"]))
-m2.metric("美股分數", int(verdict["us_score"]))
-m3.metric("夜盤分數", int(verdict["night_score"]))
-m4.metric("ETF 熱區", sectors.iloc[0]["sector"] if not sectors.empty else "待確認")
-m5.metric("風險股", len(risk_df))
+bundle = load_data()
+stocks_raw = score_stocks(bundle.etf, bundle.risk, bundle.forum)
+ms = module_summary(bundle, stocks_raw)
 
-st.subheader("先看五個模組的客觀結果")
-st.caption("規則：美股 + 台指期夜盤決定今日盤前方向；ETF 只決定觀察池；KOL 只代表注意力；處置股只負責風險扣分。")
-st.dataframe(evidence, use_container_width=True, hide_index=True)
+st.markdown(f"""
+<div class='hero'>
+  <div class='hero-title'>{APP_TITLE}</div>
+  <div class='hero-sub'>先看客觀證據，再由 AI 輔助統整。ETF 是資金熱區，不是今日方向；KOL 是注意力，不是勝率。</div>
+</div>
+""", unsafe_allow_html=True)
 
-st.subheader("AI 綜合後的五大結論")
-for row1, row2 in zip(report_items[0::2], report_items[1::2]):
-    c1, c2 = st.columns(2)
-    with c1:
-        st.markdown(f"<div class='card'><h4>{row1['title']}</h4><p>{row1['body']}</p></div>", unsafe_allow_html=True)
-    with c2:
-        st.markdown(f"<div class='card'><h4>{row2['title']}</h4><p>{row2['body']}</p></div>", unsafe_allow_html=True)
-if len(report_items) % 2 == 1:
-    st.markdown(f"<div class='card'><h4>{report_items[-1]['title']}</h4><p>{report_items[-1]['body']}</p></div>", unsafe_allow_html=True)
+st.markdown("<div class='version-box'><b>報告版本切換</b><br><span style='color:#b8aa8a'>8:50 = 盤前劇本；9:10 = 開盤確認。左側上傳功能已移除，正式資料改走 API / CSV 自動更新。</span></div>", unsafe_allow_html=True)
+mode = st.radio("報告版本", ["8:50 盤前版", "9:10 開盤確認版"], horizontal=True, label_visibility="collapsed", index=1)
 
-st.subheader("今日交易劇本")
-st.dataframe(scenario_table(str(verdict["verdict"])), use_container_width=True, hide_index=True)
+verdict, simple_reason, verdict_type = market_verdict(ms["us_score"], ms["fut_score"], mode)
+stocks = add_trade_plan(stocks_raw, verdict)
+watch = stocks[(stocks["risk_penalty"] < 25) & (stocks["total_score"] >= 50)].head(8)
 
-st.divider()
+vclass = "bull" if verdict_type == "bull" else "neutral" if verdict_type == "neutral" else ""
+st.markdown(f"<div class='verdict {vclass}'>簡單結論：{verdict}。{simple_reason}</div>", unsafe_allow_html=True)
 
-tab_overview, tab_etf, tab_market, tab_risk, tab_forum, tab_model = st.tabs([
-    "總覽", "主動 ETF 熱區", "美股 / 台指夜盤", "處置注意股", "論壇 / KOL", "規則模型"
-])
+c1, c2, c3, c4, c5 = st.columns(5)
+with c1: kpi("美股 / 費半分數", str(ms["us_score"]), ms["us_dir"])
+with c2: kpi("台指期夜盤分數", str(ms["fut_score"]), ms["fut_dir"])
+with c3: kpi("ETF 熱區", str(ms["top_sector"].get("sector", "-")), f"分數 {ms['top_sector'].get('sector_score', 0)}")
+with c4: kpi("風險股票", str(ms["risk_count"]), f"高風險 {ms['high_risk']} 檔")
+with c5: kpi("論壇 / KOL 熱度", str(ms["forum_mentions"]), "注意力，不等於勝率")
 
-with tab_overview:
-    st.subheader("盤前總覽")
-    a, b, c = st.columns(3)
-    with a:
-        st.markdown(f"<div class='evidence-card'><div class='tag'>第一優先：盤前方向</div><div class='big'>{verdict['verdict']}</div><div class='small'>美股與夜盤同向偏空時，不允許輸出偏多結論。</div></div>", unsafe_allow_html=True)
-    with b:
-        top = scores.iloc[0] if not scores.empty else None
-        st.markdown(f"<div class='evidence-card'><div class='tag'>觀察池來源</div><div class='big'>{str(top['symbol']) + ' ' + str(top['name']) if top is not None else '待確認'}</div><div class='small'>{str(top['why']) if top is not None else '資料不足'}；大盤偏空時降級觀察。</div></div>", unsafe_allow_html=True)
-    with c:
-        st.markdown(f"<div class='evidence-card'><div class='tag'>風險控管</div><div class='big'>{len(risk_df)} 檔</div><div class='small'>處置 / 注意股不拿來當利多，只扣分或排除。</div></div>", unsafe_allow_html=True)
-    st.write("")
-    st.subheader("產業熱區矩陣")
-    st.dataframe(sectors, use_container_width=True, hide_index=True)
+st.markdown("## 五個模組的客觀證據")
+module_rows = [
+    {"module":"美股 / 費半", "main":ms["us_dir"], "direction":ms["us_dir"], "score":ms["us_score"], "evidence":ms["us_evidence"]},
+    {"module":"台指期夜盤", "main":ms["fut_dir"], "direction":ms["fut_dir"], "score":ms["fut_score"], "evidence":ms["fut_evidence"]},
+    {"module":"主動 ETF", "main":str(ms["top_sector"].get("sector", "資料不足")), "direction":"中期熱區，不決定今日方向", "score":ms["top_sector"].get("sector_score", 0), "evidence":f"代表股：{ms['top_sector'].get('stocks', '')}"},
+    {"module":"處置 / 注意股", "main":f"{ms['risk_count']} 檔風險股", "direction":"風控扣分", "score":-ms["high_risk"], "evidence":f"高風險 {ms['high_risk']} 檔；處置、注意、解除都不等於利多"},
+    {"module":"論壇 / KOL", "main":"注意力集中" if ms["forum_mentions"] else "資料不足", "direction":"注意力，不等於勝率", "score":ms["forum_mentions"], "evidence":"熱門討論只用來判斷是否過熱，不作為買進理由"},
+]
+cols = st.columns(5)
+for idx, row in enumerate(module_rows, start=1):
+    with cols[idx-1]:
+        render_module(idx, row["module"], str(row["main"]), str(row["direction"]), f"分數 {row['score']}", str(row["evidence"]))
 
-with tab_etf:
-    st.subheader("主動 ETF 共識觀察股")
-    st.caption("ETF 熱區是中期資金線索，不負責判斷今天大盤會漲。")
-    display_cols = ["symbol", "name", "sector", "etf_count", "avg_weight", "weight_3d_change", "weight_5d_change", "weight_10d_change", "forum_mentions", "risk_penalty", "total_score", "conclusion", "why"]
-    st.dataframe(scores[display_cols] if not scores.empty else scores, use_container_width=True, hide_index=True)
-    if not sectors.empty:
-        st.bar_chart(sectors.set_index("sector")["total"])
-
-with tab_market:
-    st.subheader("隔夜美股與台指期夜盤")
-    st.caption("這裡是盤前方向的第一優先證據。")
-    st.dataframe(market_df, use_container_width=True, hide_index=True)
-
-with tab_risk:
-    st.subheader("處置 / 注意風險股票")
-    if risk_df.empty:
-        st.success("目前沒有處置 / 注意股資料。")
-    else:
-        st.dataframe(risk_df, use_container_width=True, hide_index=True)
-
-with tab_forum:
-    st.subheader("論壇 / KOL 注意力")
-    st.caption("注意力高不等於勝率高；高熱度 + 高漲幅反而可能是追高風險。")
-    if forum_df.empty:
-        st.info("尚無論壇資料。")
-    else:
-        f = forum_df.copy()
-        f["symbol"] = f.get("symbol", "").astype(str)
-        f = normalize_numeric(f, ["mentions"])
-        if "topic" in f.columns:
-            topic = f.groupby("topic", as_index=False).agg(mentions=("mentions", "sum")).sort_values("mentions", ascending=False)
-            st.bar_chart(topic.set_index("topic")["mentions"])
-        st.dataframe(f, use_container_width=True, hide_index=True)
-
-with tab_model:
-    st.subheader("規則模型")
-    st.markdown(
-        """
-        **硬規則：**
-        1. 如果美股 / 費半偏空，且台指期夜盤也偏空，盤前結論最高只能是「偏空 / 觀望」。
-        2. ETF 熱區只能決定「觀察池」，不能把大盤方向從偏空改成偏多。
-        3. KOL / 論壇只代表注意力，不能直接加成為買進訊號。
-        4. 處置 / 注意股只做風險扣分，不當成利多。
-        5. 9:10 版才允許根據台積電、電子權值、櫃買、台指期日盤重新調整劇本。
-
-        **下一階段：** 接正式資料源後，每天記錄「8:50 結論 → 9:10 確認 → 收盤結果」，才能回測分數是否有效。
-        """
+st.markdown("## 今日觀察股與明確條件價")
+st.markdown("<div class='warn'>價位說明：目前是示範價位。正式串接即時行情 API 後，會自動改成昨收、現價、9:10 五分鐘高點、停損價。偏空日只給『轉強價』，沒有站上就不進。</div>", unsafe_allow_html=True)
+if not watch.empty:
+    display_cols = ["symbol", "name", "sector", "total_score", "conclusion", "reference_price", "entry_price", "stop_price", "target_price", "entry_condition", "why"]
+    st.dataframe(
+        watch[display_cols].rename(columns={
+            "symbol":"代號", "name":"股票", "sector":"產業", "total_score":"總分", "conclusion":"等級",
+            "reference_price":"參考價", "entry_price":"條件進場價", "stop_price":"失效/停損價", "target_price":"第一目標", "entry_condition":"進場條件", "why":"原因"
+        }),
+        use_container_width=True,
+        hide_index=True,
     )
+else:
+    st.info("目前沒有達到條件的觀察股。")
 
-st.divider()
-st.markdown("<span class='small-muted'>MVP：研究儀表板，不是投資建議。正式公開前需補資料授權、回測、免責聲明與排程。</span>", unsafe_allow_html=True)
+st.markdown("## AI 輔助統整")
+ai_text = call_ai(verdict, ms, module_rows, watch)
+st.markdown(f"<div class='ai-box'><h3>AI 綜合結論</h3><p>{ai_text.replace(chr(10), '<br>')}</p></div>", unsafe_allow_html=True)
+
+st.markdown("## 模組細節")
+t1, t2, t3, t4, t5, t6 = st.tabs(["總覽", "主動ETF熱區", "美股/夜盤", "處置注意股", "論壇KOL", "API設定"])
+with t1:
+    st.dataframe(pd.DataFrame(module_rows), use_container_width=True, hide_index=True)
+with t2:
+    left, right = st.columns([1,1])
+    with left:
+        st.markdown("### 產業熱區")
+        st.dataframe(sector_scores(stocks), use_container_width=True, hide_index=True)
+    with right:
+        st.markdown("### ETF共識股")
+        st.dataframe(stocks.head(12), use_container_width=True, hide_index=True)
+with t3:
+    st.dataframe(bundle.market, use_container_width=True, hide_index=True)
+with t4:
+    st.dataframe(bundle.risk, use_container_width=True, hide_index=True)
+with t5:
+    st.dataframe(bundle.forum, use_container_width=True, hide_index=True)
+with t6:
+    st.markdown("""
+### 最方便的串接順序
+1. **先接行情價位 API**：讓條件價、停損價、9:10 五分鐘高點變成真實數字。
+2. **再接市場證據 API**：美股、費半、台指期夜盤。
+3. **最後接主動 ETF 持股與論壇/KOL**：因為格式最不穩定，先做可替換 adapter。
+
+### AI API：先用 Google / Gemini
+- Streamlit Cloud 請到 **Manage app → Settings → Secrets** 放 API key，不要寫進 GitHub。
+- Secrets 範例：
+```toml
+AI_PROVIDER = "google"
+GOOGLE_API_KEY = "你的 Google / Gemini API key"
+GOOGLE_MODEL = "gemini-2.5-flash"
+```
+- 若沒有設定 API key，畫面會自動使用規則版 AI 摘要，不會掛掉。
+
+### 你的公開資訊股價 API 池
+支援兩種最方便格式：
+```toml
+# A. Google Sheet 發布成 CSV
+PUBLIC_PRICE_CSV_URL = "https://docs.google.com/spreadsheets/d/e/.../pub?output=csv"
+
+# B. Google Apps Script / 其他 API endpoint
+PUBLIC_PRICE_API_URL = "https://script.google.com/macros/s/.../exec"
+PUBLIC_PRICE_API_METHOD = "GET"
+PUBLIC_PRICE_API_KEY = "如果有key才填"
+```
+欄位至少要有 symbol/code/stock_id 其中之一，價格欄位支援 price/last/close/current/reference_price。
+""")
+
+st.caption(f"產生時間：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}｜本系統為研究儀表板，不是投資建議。")
